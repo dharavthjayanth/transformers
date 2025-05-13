@@ -1,0 +1,15 @@
+{
+    "admin1": {
+      "password": "$2b$12$Q0sw3XvFNRr3r4LUebIYk.HnAxC/jypPuv4dcEYAhJOGEoE3X8n7K",
+      "datasets": ["dataset1.csv", "dataset2.csv"]
+    },
+    "user2": {
+      "password": "$2b$12$lgHtUuYRI7oaHrqZ/JTZieyiHvzszN2omP3/cnJtsg8YkuX5Md9Jy",
+      "datasets": ["dataset1.csv"]
+    },
+    "user3": {
+      "password": "$2b$12$R6h5hxyfYvlTMOjLKXZn3upROf3R6NafAlIvRQnKHa1bhBNPmevIW",
+      "datasets": ["dataset3.csv"]
+    }
+  }
+  

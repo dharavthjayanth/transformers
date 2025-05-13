@@ -1,0 +1,11 @@
+fastapi
+fastapi[all]
+pydantic
+pandas
+python-dotenv
+openai
+torch
+sentence-transformers
+pandasai
+openpyxl
+numpy

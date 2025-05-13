@@ -30,7 +30,7 @@ API_KEY = os.getenv("OPENAI_API_KEY") or "sk-..."  # Replace securely
 openai.api_key = API_KEY
 
 FOLDER_PATH = "C:\\Users\\azureadmin\\Desktop\\data"
-USERS_FILE = "users.json"
+USERS_FILE = "user.json"
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # Request Schema

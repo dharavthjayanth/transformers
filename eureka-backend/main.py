@@ -11,6 +11,8 @@ from pandasai import SmartDataframe
 from pandasai.llm.openai import OpenAI as PandasOpenAI
 from dotenv import load_dotenv
 
+from routes import auth 
+
 # Load env vars
 load_dotenv()
 
@@ -25,12 +27,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
+
 # Constants
 API_KEY = os.getenv("OPENAI_API_KEY") or "sk-..."  # Replace securely
 openai.api_key = API_KEY
 
 FOLDER_PATH = "C:\\Users\\azureadmin\\Desktop\\data"
-USERS_FILE = "user.json"
+USERS_FILE = "user.json" 
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # Request Schema

@@ -1,11 +1,12 @@
 fastapi
-fastapi[all]
-pydantic
-pandas
+uvicorn
+pymongo
 python-dotenv
+bcrypt
 openai
 torch
 sentence-transformers
-pandasai
+pandas
 openpyxl
-numpy
+pandasai
+bcrypt

@@ -14,6 +14,14 @@ const Chatbot = () => {
 
     const addMessage = (msg) => {
         setMessages((prev) => [...prev, msg]);
+
+        setTimeout(() => {
+            const dummyReply = {
+                role: "bot",
+                text: `📢 This is a sample response to: "${msg.text}"`
+            };
+            setMessages((prev) => [...prev, dummyReply]);
+        }, 500);
     };
 
     return (

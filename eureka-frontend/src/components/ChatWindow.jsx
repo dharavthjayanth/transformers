@@ -15,7 +15,10 @@ const ChatWindow = ({ messages, onSend }) => {
             <div style={{ flex: 1, overflowY: "auto", marginBottom: "1rem" }}>
                 {messages.map((msg, idx) => (
                     <div key={idx} style={{ margin: "0.5rem 0" }}>
-                        <strong>{msg.role === "user" ? "You" : "Bot"}:</strong> {msg.text}
+                        <strong style={{ color: msg.role === "user" ? "#333" : "#007acc" }}>
+                            {msg.role === "user" ? "🧑 You" : "🤖 Bot"}:
+                        </strong>{" "}
+                        {msg.text}
                     </div>
                 ))}
             </div>

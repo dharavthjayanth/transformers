@@ -1,5 +1,4 @@
 .env
 *.pyc
 __pycache__/
-data/chunks.json
-data/embedded_chunks.json
+*.json

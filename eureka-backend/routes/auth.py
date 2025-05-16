@@ -1,7 +1,17 @@
+import os
+import bcrypt
+from jose import jwt
+from dotenv import load_dotenv
+from db.database import user_collection
 from fastapi import APIRouter, HTTPException
 from schemas.user import UserCreate, UserLogin
-from db.database import user_collection
-import bcrypt
+from datetime import datetime, timedelta, timezone
+from authentication.rbac import get_user_access
+
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -31,4 +41,22 @@ def login(user: UserLogin):
     if not bcrypt.checkpw(user.password.encode("utf-8"), db_user["hashed_password"].encode("utf-8")):
         raise HTTPException(status_code=401, detail="Invalid password")
 
-    return {"message": "Login successful", "name": db_user["name"]}
+    try:
+        scopes = get_user_access(user.email)
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+    payload = {
+        "sub": user.email,
+        "scopes": scopes,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=2)
+    }
+
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "scopes": scopes,
+        "name": db_user["name"]
+    }

@@ -32,3 +32,6 @@ def upsert_to_pinecone(vectors: list, namespace: str = "default"):
         index.upsert(vectors=batch, namespace=namespace)
 
     print(f"✅ Inserted {len(items)} vectors into namespace '{namespace}'")
+
+def upsert_to_pinecone(vectors, namespace="eureka"):
+    index.upsert(vectors=vectors, namespace=namespace)

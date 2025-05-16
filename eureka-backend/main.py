@@ -1,24 +1,21 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import pandas as pd
 import os
 import json
-import openai
-import torch
-from sentence_transformers import SentenceTransformer, util
-from pandasai import SmartDataframe
-from pandasai.llm.openai import OpenAI as PandasOpenAI
 from dotenv import load_dotenv
 from azure.ingestion_pipeline import ingest_selected_chunks
-from vector_db.embedder import embed_chunks
 from vector_db.insert import upsert_to_pinecone
-from routes import auth 
+from routes import auth, query
+
+# Import OpenAI client and setup
+from openai import OpenAI
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 load_dotenv()
 
 app = FastAPI()
 
+# Allow all origins for dev
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,39 +24,100 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register route modules
 app.include_router(auth.router)
+app.include_router(query.router)
 
+# === Config ===
+CHUNKS_FILE = "data/chunks_raw.json"
+EMBEDDED_FILE = "data/embedded_chunks.json"
+BATCH_SIZE = 100
+os.makedirs("data", exist_ok=True)
+
+# === /ingest ===
 @app.get("/ingest")
-def test_ingestion():
+def ingest_all_chunks():
     chunks = ingest_selected_chunks()
+    with open(CHUNKS_FILE, "w") as f:
+        json.dump(chunks, f, indent=2)
     return {
         "total_chunks": len(chunks),
         "sample": chunks[0] if chunks else "No chunks generated"
     }
 
+# === /embed ===
 @app.get("/embed")
 def embed_all_chunks():
-    chunks = ingest_selected_chunks()
-    embedded_chunks = embed_chunks(chunks[:100])  # test with 100
-    os.makedirs("data", exist_ok=True)
-    with open("data/embedded_chunks.json", "w") as f:
-        json.dump(embedded_chunks, f, indent=2)
+    if not os.path.exists(CHUNKS_FILE):
+        raise HTTPException(status_code=400, detail="Run /ingest first")
+
+    with open(CHUNKS_FILE, "r") as f:
+        chunks = json.load(f)
+
+    if not chunks:
+        raise HTTPException(status_code=400, detail="No chunks found to embed.")
+
+    all_embeddings = []
+    total = len(chunks)
+    total_batches = (total + BATCH_SIZE - 1) // BATCH_SIZE
+
+    for i in range(0, total, BATCH_SIZE):
+        batch = chunks[i:i + BATCH_SIZE]
+        texts = [chunk["text"] for chunk in batch]
+
+        try:
+            response = client.embeddings.create(
+                input=texts,
+                model="text-embedding-3-small"
+            )
+        except Exception as e:
+            print(f"❌ Embedding failed for batch {i // BATCH_SIZE + 1}: {e}")
+            continue
+
+        embeddings = []
+        for j, result in enumerate(response.data):
+            embeddings.append({
+                "id": f"chunk_{i + j}",
+                "values": result.embedding,
+                "metadata": batch[j]["metadata"]
+            })
+
+        all_embeddings.extend(embeddings)
+        print(f"✅ Embedded batch {i // BATCH_SIZE + 1} of {total_batches}")
+
+    with open(EMBEDDED_FILE, "w") as f:
+        json.dump(all_embeddings, f, indent=2)
+
     return {
-        "embedded": len(embedded_chunks),
-        "sample": embedded_chunks[0] if embedded_chunks else {}
+        "total_embedded": len(all_embeddings),
+        "sample": all_embeddings[0] if all_embeddings else "⚠️ No data embedded"
     }
 
+# === /push ===
 @app.get("/push")
-def push_to_vector_db():
-    try:
-        with open("data/embedded_chunks.json", "r") as f:
-            embedded = json.load(f)
+def push_all_embeddings():
+    if not os.path.exists(EMBEDDED_FILE):
+        raise HTTPException(status_code=400, detail="Run /embed first")
 
-        upsert_to_pinecone(embedded[:100], namespace="eureka")
-        return {"status": "✅ Data pushed to Pinecone", "total": len(embedded)}
+    with open(EMBEDDED_FILE, "r") as f:
+        embedded_chunks = json.load(f)
 
-    except Exception as e:
-        return {"error": str(e)}
+    if not embedded_chunks:
+        raise HTTPException(status_code=400, detail="No embedded vectors found.")
+
+    total = len(embedded_chunks)
+    total_batches = (total + BATCH_SIZE - 1) // BATCH_SIZE
+
+    for i in range(0, total, BATCH_SIZE):
+        batch = embedded_chunks[i:i + BATCH_SIZE]
+        upsert_to_pinecone(batch, namespace="eureka")
+        print(f"✅ Inserted batch {i // BATCH_SIZE + 1} of {total_batches}")
+
+    return {
+        "status": "✅ Full dataset pushed to Pinecone",
+        "total_vectors": total
+    }
+
 
 # # Constants
 # API_KEY = os.getenv("OPENAI_API_KEY") or "sk-..."  # Replace securely

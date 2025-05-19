@@ -36,7 +36,6 @@ def chunk_blob_to_text(blob_path: str):
         print(f"Failed to parse {filename}: {e}")
         return []
 
-    # Chunking: one row = one chunk
     chunks = []
     for idx, row in df.iterrows():
         row_text = " | ".join([f"{col}: {str(val)}" for col, val in row.items()])

@@ -13,3 +13,4 @@ bcrypt
 azure-storage-blob
 pinecone
 python-jose[cryptography]
+numpy

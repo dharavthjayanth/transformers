@@ -1,35 +1,42 @@
 import React, { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
-import { getScopesFromToken } from "../../utilities/token";
+import { getScopesFromToken, getUserNameFromToken } from "../../utilities/token"
 
 const Chatbot = () => {
-    const [messages, setMessages] = useState([]);
-    const [scopes, setScopes] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [scopes, setScopes] = useState([]);
+  const [userName, setUserName] = useState("User");
+  const [theme, setTheme] = useState("light");
 
-    useEffect(() => {
-        const userScopes = getScopesFromToken();
-        setScopes(userScopes);
-    }, []);
+  useEffect(() => {
+    setScopes(getScopesFromToken());
+    setUserName(getUserNameFromToken());
+  }, []);
 
-    const addMessage = (msg) => {
-        setMessages((prev) => [...prev, msg]);
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
 
-        setTimeout(() => {
-            const dummyReply = {
-                role: "bot",
-                text: `📢 This is a sample response to: "${msg.text}"`
-            };
-            setMessages((prev) => [...prev, dummyReply]);
-        }, 500);
-    };
+  const addMessage = (msg) => {
+    setMessages((prev) => [...prev, msg]);
+    setTimeout(() => {
+      setMessages((prev) => [...prev, { role: "bot", text: `📢 Sample response to: "${msg.text}"` }]);
+    }, 500);
+  };
 
-    return (
-        <div style={{ display: "flex", height: "100vh" }}>
-            <Sidebar messages={messages} scopes={scopes} />
-            <ChatWindow messages={messages} onSend={addMessage} />
-        </div>
-    );
+  return (
+    <div style={{ display: "flex", height: "100vh" }}>
+      <Sidebar
+        messages={messages}
+        scopes={scopes}
+        userName={userName}
+        theme={theme}
+        setTheme={setTheme}
+      />
+      <ChatWindow messages={messages} onSend={addMessage} />
+    </div>
+  );
 };
 
 export default Chatbot;

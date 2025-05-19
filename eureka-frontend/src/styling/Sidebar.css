@@ -1,0 +1,84 @@
+.sidebar {
+  width: 280px;
+  background-color: var(--bg);
+  color: var(--text);
+  padding: 1.5rem;
+  height: 100vh;
+  overflow-y: auto;
+  box-shadow: 1px 0 5px rgba(0, 0, 0, 0.05);
+  font-family: sans-serif;
+}
+
+.user-section {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.user-avatar {
+  font-size: 3rem;
+}
+
+.user-name {
+  font-weight: bold;
+  font-size: 1.1rem;
+  margin-top: 0.5rem;
+}
+
+.sidebar h3 {
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+}
+
+.sidebar ul {
+  list-style: none;
+  padding-left: 0;
+  margin-bottom: 2rem;
+}
+
+.sidebar li {
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.theme-toggle-container {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.theme-toggle-button {
+  padding: 0.4rem 1rem;
+  background-color: transparent;
+  border: 2px solid var(--text);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease-in-out;
+}
+
+.theme-toggle-button:hover {
+  background-color: var(--text);
+  color: var(--bg);
+}
+
+.logout-container {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+.logout-button {
+  padding: 0.5rem 1rem;
+  background-color: #ff4d4f;
+  border: none;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.logout-button:hover {
+  background-color: #e04344;
+}

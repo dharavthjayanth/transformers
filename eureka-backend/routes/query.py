@@ -1,41 +1,42 @@
 import os
+import json
 from typing import List
 from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from jose import jwt, JWTError
 from openai import OpenAI
 from pinecone import Pinecone
 
 load_dotenv()
 
-SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = "HS256"
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_ENV = os.getenv("PINECONE_ENV")
-INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "eureka")
+INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "eureka-test")
 
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 pc = Pinecone(api_key=PINECONE_API_KEY)
 index = pc.Index(INDEX_NAME)
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+USER_ACCESS_PATH = os.path.join(BASE_DIR, "authentication", "users_access.json")
+
 router = APIRouter(prefix="/query", tags=["Query"])
 
 class QueryRequest(BaseModel):
+    user_id: str
     query: str
 
-def get_user_scopes_from_request(request: Request) -> List[str]:
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
-
-    token = auth_header.split(" ")[1]
+def get_user_scopes(user_id: str) -> List[str]:
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload.get("scopes", [])
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+        with open(USER_ACCESS_PATH) as f:
+            access_map = json.load(f)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to load access control file")
+
+    if user_id not in access_map:
+        raise HTTPException(status_code=403, detail="Unauthorized user")
+
+    return access_map[user_id]["access"]
 
 def get_query_embedding(query: str) -> List[float]:
     try:
@@ -48,14 +49,18 @@ def get_query_embedding(query: str) -> List[float]:
         raise HTTPException(status_code=500, detail=f"Embedding failed: {str(e)}")
 
 @router.post("/")
-def handle_query(request: Request, body: QueryRequest):
-    scopes = get_user_scopes_from_request(request)
+def handle_query(body: QueryRequest):
+    user_id = body.user_id
     query = body.query
+
+    scopes = get_user_scopes(user_id)
+    print(f"🔐 User: {user_id} | Namespaces: {scopes}")
 
     query_vector = get_query_embedding(query)
 
+    pinecone_filter = {"namespace": {"$in": scopes}}
+
     try:
-        pinecone_filter = {"domain": {"$in": scopes}}
         results = index.query(
             vector=query_vector,
             top_k=5,
@@ -65,17 +70,24 @@ def handle_query(request: Request, body: QueryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Pinecone query failed: {str(e)}")
 
-    context_chunks = [match["metadata"]["text"] for match in results["matches"]]
+    matches = results.get("matches", [])
+    print(f"📦 Pinecone matches found: {len(matches)}")
+
+    context_chunks = [match["metadata"].get("text") for match in matches if "text" in match["metadata"]]
+    print("🧠 Context chunks retrieved:")
+    for c in context_chunks:
+        print("-", c[:80] + "...")
+
     context = "\n\n".join(context_chunks)
 
     if not context:
-        return { "answer": "No relevant data found within your access scope." }
+        return {"answer": "No relevant data found within your access scope."}
 
     try:
         completion = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Answer based only on the given context."},
+                {"role": "system", "content": "Answer the question using only the context provided."},
                 {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"}
             ]
         )
@@ -83,4 +95,4 @@ def handle_query(request: Request, body: QueryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"LLM call failed: {str(e)}")
 
-    return { "answer": answer }
+    return {"answer": answer}

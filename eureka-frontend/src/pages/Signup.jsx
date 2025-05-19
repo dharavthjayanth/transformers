@@ -29,7 +29,7 @@ const Signup = () => {
             if (res.ok) {
                 const data = await res.json();
                 localStorage.setItem("token", data.access_token);
-                navigate("/dashboard");
+                navigate("/chatbot");
             } else {
                 alert("Signup failed.");
             }

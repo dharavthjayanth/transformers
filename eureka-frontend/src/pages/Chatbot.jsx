@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import ChatWindow from "../components/ChatWindow";
 import { getScopesFromToken, getUserNameFromToken } from "../../utilities/token"
+import { queryLLM } from "../../utilities/api";
 
 const Chatbot = () => {
   const [messages, setMessages] = useState([]);

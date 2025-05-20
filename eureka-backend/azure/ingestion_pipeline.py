@@ -2,7 +2,7 @@ import os
 from azure.blob_chunker import chunk_blob_to_text
 
 TARGET_BLOBS = [
-    "CPET/SALES/Sales_CPET_NEW.xlsx",
+    # "CPET/SALES/Sales_CPET_NEW.xlsx",
     "PACKAGING/SPEND/Fiori_Spend_Analysis.xlsx"
 ]
 

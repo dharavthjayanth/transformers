@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import numpy as np
 from glob import glob
 from openai import OpenAI
@@ -85,7 +86,6 @@ def embed_all_chunks():
                 "metadata": chunk["metadata"]
             }
 
-            # Append as JSONL
             with open(output_file, "a") as out_f:
                 out_f.write(json.dumps(embedding_record) + "\n")
 
@@ -98,6 +98,10 @@ def embed_all_chunks():
         "total_embedded": success_count,
         "output_dir": EMBEDDING_DIR
     }
+
+
+CHECKPOINT_DIR = "checkpoints"
+os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
 @app.get("/push")
 def push_all_embeddings():
@@ -113,6 +117,8 @@ def push_all_embeddings():
 
     for file_path in embedded_files:
         namespace = os.path.basename(os.path.dirname(file_path))
+        checkpoint_file = os.path.join(CHECKPOINT_DIR, f"{namespace}.txt")
+
         with open(file_path, "r") as f:
             lines = f.readlines()
 
@@ -123,10 +129,24 @@ def push_all_embeddings():
         total = len(records)
         total_batches = (total + BATCH_SIZE - 1) // BATCH_SIZE
 
-        for i in range(0, total, BATCH_SIZE):
+        # Load last checkpoint
+        resume_from = 0
+        if os.path.exists(checkpoint_file):
+            with open(checkpoint_file, "r") as cf:
+                resume_from = int(cf.read().strip() or "0")
+
+        for i in range(resume_from, total, BATCH_SIZE):
             batch = records[i:i + BATCH_SIZE]
-            upsert_to_pinecone(batch, namespace=namespace)
-            print(f"✅ Inserted batch {i // BATCH_SIZE + 1} of {total_batches} into namespace '{namespace}'")
+            try:
+                upsert_to_pinecone(batch, namespace=namespace)
+                print(f"✅ Inserted batch {i // BATCH_SIZE + 1} of {total_batches} into namespace '{namespace}'")
+                # Save checkpoint after successful batch
+                with open(checkpoint_file, "w") as cf:
+                    cf.write(str(i + BATCH_SIZE))
+                time.sleep(1)
+            except Exception as e:
+                print(f"❌ Failed at batch {i // BATCH_SIZE + 1}: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed at batch {i // BATCH_SIZE + 1}: {e}")
 
         total_vectors += total
 
@@ -135,4 +155,3 @@ def push_all_embeddings():
         "files_processed": len(embedded_files),
         "total_vectors": total_vectors
     }
-

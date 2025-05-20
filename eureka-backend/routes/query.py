@@ -73,12 +73,20 @@ def handle_query(body: QueryRequest):
     matches = results.get("matches", [])
     print(f"📦 Pinecone matches found: {len(matches)}")
 
-    context_chunks = [match["metadata"].get("text") for match in matches if "text" in match["metadata"]]
-    print("🧠 Context chunks retrieved:")
-    for c in context_chunks:
-        print("-", c[:80] + "...")
+    context_chunks = []
 
-    context = "\n\n".join(context_chunks)
+    if matches:
+        for i, match in enumerate(matches):
+            text = match["metadata"].get("text")
+            if text:
+                context_chunks.append(text)
+                print(f"✅ Match {i} added: {text[:80]}...")
+            else:
+                print(f"⚠️ Match {i} has no 'text' field:", match["metadata"])
+    else:
+        print("❌ Pinecone returned zero matches")
+
+        context = "\n\n".join(context_chunks)
 
     if not context:
         return {"answer": "No relevant data found within your access scope."}

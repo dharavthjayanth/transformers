@@ -3,35 +3,42 @@ from pinecone import Pinecone, ServerlessSpec
 from dotenv import load_dotenv
 
 load_dotenv()
-pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-pc_index_name = os.getenv("PINECONE_INDEX_NAME")
 
-if pc_index_name not in pc.list_indexes().names():
+# Pinecone Configuration
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "eureka")
+PINECONE_REGION = os.getenv("PINECONE_REGION", "us-west-2")
+
+# Initialize Pinecone
+pc = Pinecone(api_key=PINECONE_API_KEY)
+
+# Create index if it doesn't exist
+if PINECONE_INDEX_NAME not in pc.list_indexes().names():
     pc.create_index(
-        name=pc_index_name,
-        dimension=1536,
+        name=PINECONE_INDEX_NAME,
+        dimension=384,  # OpenAI text-embedding-3-small
         metric="cosine",
-        spec=ServerlessSpec(cloud="aws", region="us-east-1")
+        spec=ServerlessSpec(cloud="aws", region=PINECONE_REGION)
     )
 
-index = pc.Index(pc_index_name)
+# Connect to index
+index = pc.Index(PINECONE_INDEX_NAME)
 
-def upsert_to_pinecone(vectors: list, namespace: str = "default"):
+# 🧠 Unified function
+def upsert_to_pinecone(vectors: list, namespace: str = "eureka"):
     """
-    Takes a list of dicts like:
+    Upserts a list of vectors to Pinecone.
+
+    Each vector must be a dict:
     {
-        "id": ...,  # SHA256 or UUID
-        "values": [...],  # 1536-dim OpenAI embedding
-        "metadata": {...}  # domain, root, etc.
+        "id": str,
+        "values": list[float],  # 384-dim
+        "metadata": dict
     }
     """
     items = [(v["id"], v["values"], v["metadata"]) for v in vectors]
-
     for i in range(0, len(items), 100):
         batch = items[i:i + 100]
         index.upsert(vectors=batch, namespace=namespace)
 
     print(f"✅ Inserted {len(items)} vectors into namespace '{namespace}'")
-
-def upsert_to_pinecone(vectors, namespace="eureka"):
-    index.upsert(vectors=vectors, namespace=namespace)

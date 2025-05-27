@@ -1,101 +1,58 @@
-import os
-import pandas as pd
-from dotenv import load_dotenv
-from pinecone import Pinecone as PineconeClient
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
-from langchain_pinecone import PineconeVectorStore
-from pandasai import SmartDataframe
-from pandasai.llm.openai import OpenAI as PandasAIOpenAI
+# import os
+# from dotenv import load_dotenv
+# from pinecone import Pinecone
+# from openai import OpenAI
 
-# Load environment variables
-load_dotenv()
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_ENV = os.getenv("PINECONE_ENV")
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# # Load environment variables
+# load_dotenv()
 
-CSV_PATH = "output.csv"
-QUERY = "which plant spend more on Packaging & Supplies for year 2024?"
+# # ENV variables
+# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+# PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME")
 
-def fetch_relevant_chunks(query):
-    pc = PineconeClient(api_key=PINECONE_API_KEY)
-    index = pc.Index(PINECONE_INDEX_NAME)
-    embeddings = OpenAIEmbeddings(model="text-embedding-3-small", api_key=OPENAI_API_KEY)
-    vectorstore = PineconeVectorStore(index=index, embedding=embeddings, text_key="text")
-    retriever = vectorstore.as_retriever()
-    docs = retriever.invoke(query)
-    print(f"📦 Retrieved {len(docs)} documents from Pinecone")
-    return docs
+# # Init Pinecone
+# pc = Pinecone(api_key=PINECONE_API_KEY)
+# index = pc.Index(PINECONE_INDEX_NAME)
 
-def analyze_with_pandasai(docs, query):
-    print("\n📊 Converting retrieved chunks into DataFrame for analysis...")
-    raw_data = [doc.page_content for doc in docs]
+# # Init OpenAI client
+# client = OpenAI(api_key=OPENAI_API_KEY)
 
-    records = []
-    for text in raw_data:
-        row = {}
-        for line in text.split("\n"):
-            if ":" in line:
-                k, v = line.split(":", 1)
-                row[k.strip()] = v.strip()
-        records.append(row)
+# # Query
+# query = "What is the total spend on Additive in 2024?"
 
-    df = pd.DataFrame(records)
+# # Create embedding (new SDK usage)
+# embedding_response = client.embeddings.create(
+#     model="text-embedding-3-small",
+#     input=query
+# )
+# embedding = embedding_response.data[0].embedding
 
-    # Optional cleaning
-    if "PO_Net_Amount" in df.columns:
-        df["PO_Net_Amount"] = df["PO_Net_Amount"].replace('[\$,]', '', regex=True).astype(float)
+# # Query Pinecone
+# res = index.query(vector=embedding, top_k=5, include_metadata=True)
+# contexts = [match["metadata"]["text"] for match in res["matches"]]
+# context_text = "\n".join(contexts)
 
-    if "Purchase_Order_Date" in df.columns:
-        df["Year"] = pd.to_datetime(df["Purchase_Order_Date"], errors="coerce", dayfirst=True).dt.year
+# # Final prompt
+# final_prompt = f"""You are a helpful assistant. Based on the following context, answer the question:
 
-    print(df.head(3))
+# Context:
+# {context_text}
 
-    pandasai_llm = PandasAIOpenAI(api_token=OPENAI_API_KEY, model="gpt-3.5-turbo")
-    smart_df = SmartDataframe(df, config={"llm": pandasai_llm})
+# Question: {query}
+# Answer:"""
 
-    instruction = f"""
-You are working with a DataFrame containing purchase order data.
+# # Chat completion (new SDK usage)
+# response = client.chat.completions.create(
+#     model="gpt-4",
+#     messages=[{"role": "user", "content": final_prompt}]
+# )
 
-Columns include:
-- Company Code
-- Purchase Order
-- Purchase Order Date
-- Material
-- Material Description
-- Material_Group
-- Material_Group description
-- Plant
-- Plant_Description
-- Supplier
-- Supplier_description
-- Supplier_Country description
-- PO_Net_Amount (monetary values)
-- Quantity and UOM
-- Purchase_Order_Date (format: DD.MM.YYYY)
+# # Output
+# print("📤 RAG Answer:\n", response.choices[0].message.content)
 
-You may need to look for rows where 'Material_Group description' contains the word 'Additive' (case-insensitive match).
-You must:
-1. Extract the year from Purchase_Order_Date if filtering by time.
-2. Filter by conditions like 'PET' in Material_Group.
-3. Convert PO_Net_Amount to float (remove symbols).
-4. Sum values when asked about total spend.
+from openai import OpenAI
 
-Now answer this:
-{query}
-"""
-
-    return smart_df.chat(instruction)
-
-def main():
-    print(f"✅ Using Pinecone Index: {PINECONE_INDEX_NAME}")
-    docs = fetch_relevant_chunks(QUERY)
-    if not docs:
-        print("❌ No documents retrieved.")
-        return
-    result = analyze_with_pandasai(docs, QUERY)
-    print("\n💬 Answer from PandasAI:")
-    print(result)
-
-if __name__ == "__main__":
-    main()
+client = OpenAI(api_key="your-api-key")
+res = client.embeddings.create(model="text-embedding-3-small", input="hello world")
+print(res.data[0].embedding[:5])

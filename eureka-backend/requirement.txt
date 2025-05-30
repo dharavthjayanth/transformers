@@ -1,7 +1,9 @@
-openai==0.28
-pinecone-client==3.0.2
-python-dotenv==1.0.1
-ipykernel
+langchain>=0.2.0
+langchain-openai>=0.1.5
+langchain-community>=0.0.15
+openai>=1.10.0
+python-dotenv
+sqlalchemy
 pandas
-chardet
-openpyxl
+ipykernel
+matplotlib

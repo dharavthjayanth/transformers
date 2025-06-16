@@ -10,3 +10,6 @@ matplotlib
 rapidfuzz
 spacy>=3.0.0
 import-ipynb
+seaborn
+sqlalchemy
+tqdm

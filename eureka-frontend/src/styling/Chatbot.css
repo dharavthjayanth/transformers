@@ -1,6 +1,0 @@
-.chatbot-container {
-  display: flex;
-  height: 100vh;
-  background-color: var(--bg);
-  color: var(--text);
-}

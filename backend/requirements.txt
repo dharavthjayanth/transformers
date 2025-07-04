@@ -49,3 +49,4 @@ uvicorn==0.35.0
 watchdog
 fastapi==0.110.2
 python-dotenv
+tabulate

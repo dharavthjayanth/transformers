@@ -7,7 +7,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 st.set_page_config(page_title="Eureka Assistant", layout="centered")
-FASTAPI_BASE_URL = "http://localhost:8000"
+FASTAPI_BASE_URL = "https://transformers-kdk5.onrender.com"
 
 # -------------------------------------
 # SIDEBAR NAVIGATION + INSTRUCTIONS

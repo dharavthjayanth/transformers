@@ -227,33 +227,33 @@ insight_chain = insight_prompt | llm | StrOutputParser()
 
 ## AGENTS
 
-finance_csv_agent = create_csv_agent(llm, finance_file, verbose=False, allow_dangerous_code=True)
-inventory_csv_agent = create_csv_agent(llm, finance_file, verbose=False, allow_dangerous_code=True)
-spend_csv_agent = create_csv_agent(llm, finance_file, verbose=False, allow_dangerous_code=True)
-sales_csv_agent = create_csv_agent(llm, finance_file, verbose=False, allow_dangerous_code=True)
+finance_csv_agent = create_csv_agent(llm, finance_file, verbose=True, allow_dangerous_code=True)
+inventory_csv_agent = create_csv_agent(llm, finance_file, verbose=True, allow_dangerous_code=True)
+spend_csv_agent = create_csv_agent(llm, finance_file, verbose=True, allow_dangerous_code=True)
+sales_csv_agent = create_csv_agent(llm, finance_file, verbose=True, allow_dangerous_code=True)
 
 finance_sql_agent = create_sql_agent(
-    llm=llm, toolkit=finance_toolkit, verbose=False, allow_dangerous_code=True,
+    llm=llm, toolkit=finance_toolkit, verbose=True, allow_dangerous_code=True,
     max_iterations=40, max_execution_time=120, memory=memory,
     handle_parsing_errors=True, early_stopping_method="generate",
     prefix=sql_agent_prompt_prefix
 )
 
 inventory_sql_agent = create_sql_agent(
-    llm=llm, toolkit=inventory_toolkit, verbose=False, allow_dangerous_code=True,
+    llm=llm, toolkit=inventory_toolkit, verbose=True, allow_dangerous_code=True,
     max_iterations=40, max_execution_time=120, memory=memory,
     handle_parsing_errors=True, early_stopping_method="generate",
     prefix=sql_agent_prompt_prefix
 )
 
 spend_sql_agent = create_sql_agent(
-    llm=llm, toolkit=spend_toolkit, verbose=False, allow_dangerous_code=True,
+    llm=llm, toolkit=spend_toolkit, verbose=True, allow_dangerous_code=True,
     max_iterations=40, max_execution_time=120, handle_parsing_errors=True, 
     early_stopping_method="generate", prefix=sql_agent_prompt_prefix
 )
 
 sales_sql_agent = create_sql_agent(
-    llm=llm, toolkit=sales_toolkit, verbose=False, allow_dangerous_code=True,
+    llm=llm, toolkit=sales_toolkit, verbose=True, allow_dangerous_code=True,
     max_iterations=40, max_execution_time=120,
     handle_parsing_errors=True, early_stopping_method="generate",
     prefix=sql_agent_prompt_prefix
@@ -474,11 +474,10 @@ def master_agent(user_query):
 #     "Show total sales invoice net value for 2023 and 2024.",
 #     "Which customers contributed most to sales in 2024?",
 #     "Which customer name had the highest total ending balance in global currency for company code TH14?",
-#     "What is the sum of ending balance of cusomter PEPSI COLA PRODUCTS PHILIPPINES INC in 2024?",
+#     "What is the sum of ending balance of cusomter PEPSI COLA PRODUCTS PHILIPPINES INC in 2024?",if 
 #     "Which company showed the most fluctuation for each quarter in ending balance in 2024?",
 #     "Give me top 5 customers with the highest ending balance in 2024?",
 #     "Compare Sales Performance for different quarters in 2024 for each company",
-#     "F    "
 # ]
 
 # FastAPI endpoint

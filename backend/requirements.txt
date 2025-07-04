@@ -45,7 +45,7 @@ tqdm
 typing-extensions
 tzdata
 urllib3
-uvicorn
+uvicorn==0.35.0
 watchdog
-fastapi
+fastapi==0.110.2
 python-dotenv

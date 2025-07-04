@@ -52,12 +52,12 @@ memory = ConversationBufferMemory(memory_key="chat_history", return_messages=Tru
 llm = ChatOpenAI(temperature=0.5, model="gpt-4o")
 persistent_instructions = []
 
-## READ THE FILES
+## READ THE FILES   
 
-finance_file = "/Users/keshavsaraogi/Desktop/indorama/eureka-data/clean-csv/cleaned_finance_packaging.csv"
-inventory_file = "/Users/keshavsaraogi/Desktop/indorama/eureka-data/clean-csv/cleaned_inventory_packaging.csv"
-spend_file = "/Users/keshavsaraogi/Desktop/indorama/eureka-data/clean-csv/cleaned_spend_packaging.csv"
-sales_file = "/Users/keshavsaraogi/Desktop/indorama/eureka-data/clean-csv/cleaned_sales_packaging.csv"
+finance_file = os.getenv("F_URL")
+inventory_file = os.getenv("I_URL")
+spend_file = os.getenv("SP_URL")
+sales_file = os.getenv("SA_URL")
 
 ## CREATING DATAFRAMES
 

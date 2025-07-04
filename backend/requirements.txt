@@ -47,3 +47,5 @@ tzdata
 urllib3
 uvicorn
 watchdog
+fastapi
+python-dotenv

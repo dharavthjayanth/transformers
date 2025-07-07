@@ -453,7 +453,7 @@ def master_agent(user_query):
                 import re
                 sql_output = result.get("output") if isinstance(result, dict) else result
                 conn = db_map[dataset]
-                sql_pattern = r"Action: sql_db_query\s+Action Input:\s*(.*?)\n(?:Observation|Thought|Final Answer):"
+                sql_pattern = r"Action: sql_db_query\s+Action Input:\s*(.*?)\s*(?:Observation|Thought|Final Answer):"
                 match = re.search(sql_pattern, sql_output, re.DOTALL)
                 sql_query = match.group(1).strip() if match else None
                 if sql_query and sql_query.lower().startswith("select"):

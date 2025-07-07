@@ -303,8 +303,31 @@ def build_column_value_cache(df: pd.DataFrame, max_values_per_column: int = 100)
     return dict(value_cache)
 
 def resolve_column_from_value(query: str, value_cache: dict, target_value: str) -> str:
+    """
+    Use LLM to resolve which column a target value like 'PH10' belongs to, using normalized value cache.
+    """
+    from difflib import get_close_matches
+
+    # Normalize the value cache for better fuzzy matching
+    normalized_cache = {
+        col: {val.lower().strip() for val in values if isinstance(val, str)}
+        for col, values in value_cache.items()
+    }
+
+    # Try to narrow down matching columns by fuzzy matching
+    match_candidates = {
+        col: get_close_matches(target_value.lower().strip(), norm_vals, n=1, cutoff=0.8)
+        for col, norm_vals in normalized_cache.items()
+    }
+    filtered_matches = {col: match for col, match in match_candidates.items() if match}
+
+    # If there's only one good match, return that directly
+    if len(filtered_matches) == 1:
+        return list(filtered_matches.keys())[0]
+
+    # Else fall back to LLM-based reasoning
     formatted_cache = "\n".join(
-        f"{col}: {sorted(list(values))}" for col, values in value_cache.items() if target_value in values
+        f"{col}: {sorted(list(value_cache[col]))}" for col in filtered_matches.keys()
     )
 
     resolution_prompt = PromptTemplate.from_template("""
@@ -327,7 +350,6 @@ def resolve_column_from_value(query: str, value_cache: dict, target_value: str) 
         "column_values": formatted_cache
     })
     return result.strip()
-
 
 def classify_visualization_type(user_query: str, df_result: pd.DataFrame) -> str:
     try:
@@ -486,7 +508,11 @@ def master_agent(user_query):
 
         # 🔍 Column Disambiguation Logic
         value_cache = column_value_caches[dataset]
-        potential_tokens = re.findall(r"\b[A-Z]{2,}\d{2,}\b", user_query)
+        potential_tokens = [
+            token for token in set(re.findall(r"\b[A-Z0-9\-_.]{2,}\b", user_query))
+            if any(token.lower().strip() in {val.lower().strip() for val in values if isinstance(val, str)}
+                for values in value_cache.values())
+        ]
 
         for token in potential_tokens:
             matching_columns = [col for col, values in value_cache.items() if token in values]

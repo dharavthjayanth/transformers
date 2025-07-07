@@ -308,27 +308,25 @@ def build_column_value_cache(df: pd.DataFrame, max_values_per_column: int = 100)
 def resolve_column_from_value(query: str, value_cache: dict, target_value: str) -> str:
     """
     Use LLM to resolve which column a target value like 'PH10' belongs to, using normalized value cache.
+    Automatically resolves to column if fuzzy match is unambiguous.
     """
     from difflib import get_close_matches
 
-    # Normalize the value cache for better fuzzy matching
+    # Normalize value cache for fuzzy matching
     normalized_cache = {
         col: {val.lower().strip() for val in values if isinstance(val, str)}
         for col, values in value_cache.items()
     }
 
-    # Try to narrow down matching columns by fuzzy matching
     match_candidates = {
         col: get_close_matches(target_value.lower().strip(), norm_vals, n=1, cutoff=0.8)
         for col, norm_vals in normalized_cache.items()
     }
     filtered_matches = {col: match for col, match in match_candidates.items() if match}
 
-    # If there's only one good match, return that directly
     if len(filtered_matches) == 1:
         return list(filtered_matches.keys())[0]
 
-    # Else fall back to LLM-based reasoning
     formatted_cache = "\n".join(
         f"{col}: {sorted(list(value_cache[col]))}" for col in filtered_matches.keys()
     )
@@ -344,6 +342,9 @@ def resolve_column_from_value(query: str, value_cache: dict, target_value: str) 
 
     Which column does the value '{value}' most likely belong to?
     Respond ONLY with a column name from the list above.
+
+    Helpful Tip:
+    Use context like 'sales', 'plant', 'country', or specific words like 'company ID' to infer matches.
     """)
 
     chain = resolution_prompt | llm | StrOutputParser()

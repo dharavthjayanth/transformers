@@ -20,6 +20,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Request
 from langchain.memory import ConversationBufferMemory
 from langchain.schema import HumanMessage, AIMessage
+import re
+from collections import defaultdict
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -290,6 +292,43 @@ def get_column_names(filepath):
     df = pd.read_csv(filepath, nrows=1)
     return list(df.columns)
 
+def build_column_value_cache(df: pd.DataFrame, max_values_per_column: int = 100) -> dict:
+    value_cache = defaultdict(set)
+    for col in df.columns:
+        try:
+            unique_vals = df[col].dropna().astype(str).str.strip().unique()[:max_values_per_column]
+            value_cache[col].update(unique_vals)
+        except Exception:
+            continue
+    return dict(value_cache)
+
+def resolve_column_from_value(query: str, value_cache: dict, target_value: str) -> str:
+    formatted_cache = "\n".join(
+        f"{col}: {sorted(list(values))}" for col, values in value_cache.items() if target_value in values
+    )
+
+    resolution_prompt = PromptTemplate.from_template("""
+    You are a column disambiguator.
+
+    Known column values:
+    {column_values}
+
+    User Query:
+    {query}
+
+    Which column does the value '{value}' most likely belong to?
+    Respond ONLY with a column name from the list above.
+    """)
+
+    chain = resolution_prompt | llm | StrOutputParser()
+    result = chain.invoke({
+        "query": query,
+        "value": target_value,
+        "column_values": formatted_cache
+    })
+    return result.strip()
+
+
 def classify_visualization_type(user_query: str, df_result: pd.DataFrame) -> str:
     try:
         # Prepare data preview
@@ -318,6 +357,11 @@ finance_columns = get_column_names(finance_file)
 inventory_columns = get_column_names(inventory_file)
 spend_columns = get_column_names(spend_file)
 sales_columns = get_column_names(sales_file)
+
+finance_value_cache = build_column_value_cache(finance_df)
+inventory_value_cache = build_column_value_cache(inventory_df)
+spend_value_cache = build_column_value_cache(spend_df)
+sales_value_cache = build_column_value_cache(sales_df)
 
 def route_dataset(user_query: str) -> str:
     chain = dataset_routing_prompt | llm | StrOutputParser()
@@ -374,6 +418,8 @@ def apply_instruction_prefix(query: str) -> str:
         return f"{prefix}\n\n{query.strip()}"
     return query.strip()
 
+# 🔁 Refactored master_agent function with column disambiguation included
+
 def master_agent(user_query):
     try:
         print("🧠 Chat memory (last turn):")
@@ -399,7 +445,7 @@ def master_agent(user_query):
                     "dataframe": None
                 }
 
-        # 🔁 Apply instructions
+        # 🔁 Apply persistent instructions
         user_query = apply_instruction_prefix(user_query)
 
         # 🔀 Routing
@@ -428,8 +474,28 @@ def master_agent(user_query):
             "sales": sales_db,
         }
 
+        column_value_caches = {
+            "finance": finance_value_cache,
+            "inventory": inventory_value_cache,
+            "spend": spend_value_cache,
+            "sales": sales_value_cache,
+        }
+
         if dataset == "spend" and agent_type == "sql":
             user_query += f"\n\n{PACKAGING_KNOWLEDGE}"
+
+        # 🔍 Column Disambiguation Logic
+        value_cache = column_value_caches[dataset]
+        potential_tokens = re.findall(r"\b[A-Z]{2,}\d{2,}\b", user_query)
+
+        for token in potential_tokens:
+            matching_columns = [col for col, values in value_cache.items() if token in values]
+            if len(matching_columns) > 1:
+                resolved_column = resolve_column_from_value(user_query, value_cache, token)
+                user_query = user_query.replace(token, f"{resolved_column} = '{token}'")
+            elif len(matching_columns) == 1:
+                col = matching_columns[0]
+                user_query = user_query.replace(token, f"{col} = '{token}'")
 
         agent = agents[dataset][agent_type]
         df_result = df_map[dataset]

@@ -168,6 +168,13 @@ Final Answer: Unable to retrieve the data due to internal error.
 - Use "Column" IS NOT NULL for all aggregated or filtered numeric columns.
 - If a SUM or COUNT returns NULL, assume fallback value 0 and proceed with reasoning.
 - If query output is empty or all values are NULL, return 0 instead of NULL.
+- When answering questions that require the top or most frequent value by category (e.g., best-selling product per quarter), use a subquery or windowed aggregation.
+- For quarterly breakdowns, use strftime('%m', "Date Column") and map to Q1–Q4 using CASE WHEN.
+- For finding maximums within groups (e.g., most sold, highest revenue), GROUP BY the category (like quarter or material), then filter using HAVING MAX() or a correlated subquery.
+- Always GROUP BY fields referenced in SELECT unless you're using an aggregation function.
+- When comparing strings, use LOWER(TRIM(...)) to match flexible values.
+- If a query involves ranking, lead with aggregation in a subquery and filter to the top result.
+
 """
 
 dataset_routing_prompt = PromptTemplate.from_template("""
@@ -525,6 +532,7 @@ def master_agent(user_query):
         # 🧠 Run
         try:
             if isinstance(agent, AgentExecutor):
+                print("🧠 Final rewritten user query for SQL Agent:", user_query)
                 result = agent.invoke(user_query, handle_parsing_errors=True)
             else:
                 result = agent.invoke(user_query)

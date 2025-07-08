@@ -23,6 +23,7 @@ from langchain.schema import HumanMessage, AIMessage
 import re
 from collections import defaultdict
 from datetime import datetime
+import openai
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -240,6 +241,22 @@ Data preview:
 Respond with one word only: bar, line, scatter, pie, histogram, or none.
 """)
 
+CLASSIFIER_PROMPT_TEMPLATE = """
+You are an assistant that classifies follow-up instructions.
+
+Determine what the user's follow-up instruction is referring to:
+1. The last message only
+2. A specific earlier query (if they mention something like 'previous question about revenue')
+3. The entire conversation so far
+
+Instruction: "{instruction}"
+Chat history:
+{chat_history}
+
+Classify the reference as one of: [LAST_MESSAGE, SPECIFIC_QUERY, ENTIRE_HISTORY]
+Respond with just the classification.
+"""
+
 ## CUSTOM CHAINS
 
 visualization_chain = visualization_prompt | llm | StrOutputParser()
@@ -281,6 +298,12 @@ sales_sql_agent = create_sql_agent(
 
 
 ## AGENT FUNCTIONS
+
+import difflib
+
+def fuzzy_match(instruction: str, past_queries: list[str]) -> str:
+    matches = difflib.get_close_matches(instruction, past_queries, n=1, cutoff=0.3)
+    return matches[0] if matches else past_queries[-1]  
 
 def classify_intent_llm(query: str) -> str:
     return (intent_prompt | llm | StrOutputParser()).invoke({"query": query}).strip().lower()
@@ -359,6 +382,18 @@ def resolve_column_from_value(query: str, value_cache: dict, target_value: str) 
         "column_values": formatted_cache
     })
     return result.strip()
+
+def classify_followup_scope(instruction: str, chat_history: list[str]) -> str:
+    prompt = CLASSIFIER_PROMPT_TEMPLATE.format(
+        instruction=instruction,
+        chat_history="\n".join(chat_history[-5:])  # or full chat log
+    )
+    response = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0
+    )
+    return response.choices[0].message["content"].strip().upper()
 
 def classify_visualization_type(user_query: str, df_result: pd.DataFrame) -> str:
     try:
@@ -693,18 +728,27 @@ def add_instruction(payload: dict):
     return {"error": "Instruction cannot be empty."}
 
 @app.post("/followup")
-async def followup_query(request: FollowUpQuery):
-    user_instruction = request.instruction  # e.g., "Change last result to kg"
-    
-    last = conversation_memory[-1]  # Simplified for now
-    
-    if "kg" in user_instruction.lower() and last["unit"] == "metric tons":
-        new_value = last["value"] * 1000
-        new_unit = "kilograms"
-        return {
-            "original_query": last["user_query"],
-            "original_answer": last["answer"],
-            "modified_answer": f"{new_value} {new_unit}"
-        }
+def followup_query(data: FollowUpQuery):
+    instruction = data.instruction
+    history = [item["user_query"] for item in conversation_memory]
+
+    scope = classify_followup_scope(instruction, history)
+
+    if scope == "LAST_MESSAGE":
+        ref_query = conversation_memory[-1]["user_query"]
+
+    elif scope == "SPECIFIC_QUERY":
+        # Use embedding/fuzzy match to pick the right query from memory
+        ref_query = fuzzy_match(instruction, history)
+
+    elif scope == "ENTIRE_HISTORY":
+        ref_query = " ".join([q["user_query"] for q in conversation_memory])
+
     else:
-        return {"message": "No matching transformation found."}
+        return {"message": "❌ Unable to classify instruction."}
+
+    # Generate the rewritten query and call the agent
+    full_prompt = f"{ref_query}\nFollow-up: {instruction}"
+    result = master_agent(full_prompt)
+
+    return {"modified_answer": result}

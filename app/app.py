@@ -1,9 +1,9 @@
-# app.py
 import streamlit as st
 import requests
 import pandas as pd
 import sys
 import os
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 st.set_page_config(page_title="Eureka Assistant", layout="centered")
@@ -98,9 +98,39 @@ if page == "🧠 Chat with Assistant":
                     # If there's a dataframe, visualize it
                     if df_json:
                         df_result = pd.read_json(df_json, orient="split")
+                        st.dataframe(df_result)
 
                 except Exception as e:
                     st.error(f"⚠️ Error: {e}")
+
+    # -------------------------------------
+    # FOLLOW-UP INPUT (appears after assistant response)
+    # -------------------------------------
+    if st.session_state.messages and st.session_state.messages[-1]["role"] == "assistant":
+        followup_input = st.chat_input("↪️ Follow up on the last answer...")
+        if followup_input:
+            st.session_state.messages.append({"role": "user", "content": followup_input})
+            with st.chat_message("user"):
+                st.markdown(followup_input)
+
+            with st.chat_message("assistant"):
+                with st.spinner("Modifying answer..."):
+                    try:
+                        response = requests.post(
+                            f"{FASTAPI_BASE_URL}/followup",
+                            json={"instruction": followup_input},
+                            timeout=60
+                        )
+                        result = response.json()
+                        if "modified_answer" in result:
+                            modified_msg = result["modified_answer"]
+                        else:
+                            modified_msg = result.get("message", "⚠️ Could not modify the previous answer.")
+
+                        st.markdown(modified_msg)
+                        st.session_state.messages.append({"role": "assistant", "content": modified_msg})
+                    except Exception as e:
+                        st.error(f"⚠️ Follow-up error: {e}")
 
 # -------------------------------------
 # PAGE 2: Chat History Viewer

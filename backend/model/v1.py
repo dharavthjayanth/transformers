@@ -22,6 +22,7 @@ from langchain.memory import ConversationBufferMemory
 from langchain.schema import HumanMessage, AIMessage
 import re
 from collections import defaultdict
+from datetime import datetime
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -48,11 +49,15 @@ app.add_middleware(
 # Request model
 class QueryRequest(BaseModel):
     query: str
+    
+class FollowUpQuery(BaseModel):
+    instruction: str
 
 ## LLM CONFIGURATION
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 llm = ChatOpenAI(temperature=0.5, model="gpt-4o")
 persistent_instructions = []
+conversation_memory = []
 
 ## READ THE FILES   
 
@@ -591,9 +596,34 @@ def master_agent(user_query):
 @app.post("/query")
 def query_endpoint(data: QueryRequest):
     result = master_agent(data.query)
+
+    # Extract response string
     if isinstance(result, dict):
-        return {"response": result.get("output") or result.get("error") or "Unknown error"}
-    return {"response": result}
+        response = result.get("output") or result.get("error") or "Unknown error"
+    else:
+        response = result
+
+    # Try to extract numeric value and unit (basic pattern: number + unit)
+    match = re.search(r"([\d,\.]+)\s*(\w+)", response)
+    if match:
+        try:
+            value = float(match.group(1).replace(",", ""))
+            unit = match.group(2)
+        except:
+            value, unit = None, None
+    else:
+        value, unit = None, None
+
+    # Store in temporary memory
+    conversation_memory.append({
+        "user_query": data.query,
+        "response": response,
+        "value": value,
+        "unit": unit,
+        "timestamp": datetime.now().isoformat()
+    })
+
+    return {"response": response}
 
 @app.post("/chat")
 async def chat_endpoint(request: Request):
@@ -661,3 +691,20 @@ def add_instruction(payload: dict):
         persistent_instructions.append(instruction)
         return {"message": "Instruction added successfully."}
     return {"error": "Instruction cannot be empty."}
+
+@app.post("/followup")
+async def followup_query(request: FollowUpQuery):
+    user_instruction = request.instruction  # e.g., "Change last result to kg"
+    
+    last = conversation_memory[-1]  # Simplified for now
+    
+    if "kg" in user_instruction.lower() and last["unit"] == "metric tons":
+        new_value = last["value"] * 1000
+        new_unit = "kilograms"
+        return {
+            "original_query": last["user_query"],
+            "original_answer": last["answer"],
+            "modified_answer": f"{new_value} {new_unit}"
+        }
+    else:
+        return {"message": "No matching transformation found."}

@@ -24,6 +24,7 @@ import re
 from collections import defaultdict
 from datetime import datetime
 import openai
+from openai import OpenAIError
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -57,6 +58,7 @@ class FollowUpQuery(BaseModel):
 ## LLM CONFIGURATION
 memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 llm = ChatOpenAI(temperature=0.5, model="gpt-4o")
+llm_classifier = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
 persistent_instructions = []
 conversation_memory = []
 
@@ -80,6 +82,17 @@ spend_df['Purchase_Order_Date'] = pd.to_datetime(spend_df['Purchase_Order_Date']
 spend_df['Purchase_Order_Date'] = spend_df['Purchase_Order_Date'].dt.strftime("%Y-%m-%d")
 
 ## DATABASE CONFIGURATION
+
+def is_meta_query(query: str, llm: ChatOpenAI) -> bool:
+    prompt = f"""Is the following query about the assistant's identity, capabilities, or personality? 
+        Respond with ONLY 'YES' or 'NO'. 
+        Query: "{query}" """
+    
+    try:
+        response = llm.invoke(prompt).content.strip().lower()
+        return "yes" in response
+    except OpenAIError:
+        return False
 
 def create_in_memory_db(df, table_name):
     conn = sqlite3.connect(":memory:", check_same_thread=False)
@@ -628,17 +641,27 @@ def master_agent(user_query):
 # ]
 
 # FastAPI endpoint
+# ---- FastAPI endpoint ----
 @app.post("/query")
 def query_endpoint(data: QueryRequest):
-    result = master_agent(data.query)
+    query = data.query
 
-    # Extract response string
-    if isinstance(result, dict):
-        response = result.get("output") or result.get("error") or "Unknown error"
+    # 🔍 Step 1: Check if it's a meta-query
+    if is_meta_query(query, llm_classifier):
+        response = (
+            "I'm an AI assistant built with OpenAI and LangChain. "
+            "I help answer questions about Finance, Inventory, Spend, and Sales data by analyzing uploaded CSV files."
+        )
     else:
-        response = result
+        # 🔁 Step 2: Run normal CSV agent
+        result = master_agent(query)
 
-    # Try to extract numeric value and unit (basic pattern: number + unit)
+        if isinstance(result, dict):
+            response = result.get("output") or result.get("error") or "Unknown error"
+        else:
+            response = result
+
+    # 🔢 Step 3: Try extracting number + unit
     match = re.search(r"([\d,\.]+)\s*(\w+)", response)
     if match:
         try:
@@ -649,9 +672,9 @@ def query_endpoint(data: QueryRequest):
     else:
         value, unit = None, None
 
-    # Store in temporary memory
+    # 💾 Step 4: Store to conversation memory
     conversation_memory.append({
-        "user_query": data.query,
+        "user_query": query,
         "response": response,
         "value": value,
         "unit": unit,

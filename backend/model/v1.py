@@ -86,7 +86,7 @@ spend_df['Purchase_Order_Date'] = spend_df['Purchase_Order_Date'].dt.strftime("%
 def is_meta_query(query: str, llm: ChatOpenAI) -> bool:
     prompt = f"""Is the following query about the assistant's identity, capabilities, or personality? 
         Respond with ONLY 'YES' or 'NO'. 
-        Query: "{query}" """
+        Query: \"{query}\" """
     
     try:
         response = llm.invoke(prompt).content.strip().lower()
@@ -717,7 +717,6 @@ async def chat_endpoint(request: Request):
             "dataframe": None
         }
 
-    # 🔁 Fallback to master_agent
     result = master_agent(latest_user_msg)
 
     output = result.get("response", "No response.")

@@ -688,13 +688,6 @@ async def chat_endpoint(request: Request):
     body = await request.json()
     messages = body.get("messages", [])
 
-    lc_chat_history = convert_to_langchain_messages(messages)
-    memory.chat_memory.messages = lc_chat_history
-
-    print("🧠 Chat memory (last turn):")
-    for m in memory.chat_memory.messages[-2:]:
-        print(m)
-
     latest_user_msg = next(
         (msg["content"] for msg in reversed(messages) if msg["role"] == "user"), None
     )
@@ -702,11 +695,11 @@ async def chat_endpoint(request: Request):
     if not latest_user_msg:
         return {"message": {"role": "assistant", "content": "No user message found."}}
 
-    # ✅ Add meta-query short-circuit
+    # ✅ EARLY meta query check
     if is_meta_query(latest_user_msg, llm_classifier):
         response = (
             "I'm an AI assistant built with OpenAI and LangChain. "
-            "I help answer questions about Finance, Inventory, Spend, and Sales data by analyzing uploaded CSV files."
+            "I help answer questions about Finance, Inventory, Spend, and Sales data."
         )
         return {
             "message": {

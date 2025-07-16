@@ -690,7 +690,7 @@ async def chat_endpoint(request: Request):
 
     lc_chat_history = convert_to_langchain_messages(messages)
     memory.chat_memory.messages = lc_chat_history
-    
+
     print("🧠 Chat memory (last turn):")
     for m in memory.chat_memory.messages[-2:]:
         print(m)
@@ -698,10 +698,26 @@ async def chat_endpoint(request: Request):
     latest_user_msg = next(
         (msg["content"] for msg in reversed(messages) if msg["role"] == "user"), None
     )
-    
+
     if not latest_user_msg:
         return {"message": {"role": "assistant", "content": "No user message found."}}
 
+    # ✅ Add meta-query short-circuit
+    if is_meta_query(latest_user_msg, llm_classifier):
+        response = (
+            "I'm an AI assistant built with OpenAI and LangChain. "
+            "I help answer questions about Finance, Inventory, Spend, and Sales data by analyzing uploaded CSV files."
+        )
+        return {
+            "message": {
+                "role": "assistant",
+                "content": response
+            },
+            "image": None,
+            "dataframe": None
+        }
+
+    # 🔁 Fallback to master_agent
     result = master_agent(latest_user_msg)
 
     output = result.get("response", "No response.")
@@ -716,13 +732,14 @@ async def chat_endpoint(request: Request):
         image = None
 
     return {
-    "message": {
-        "role": "assistant",
-        "content": output
-    },
-    "image": image,
-    "dataframe": dataframe_json
-}
+        "message": {
+            "role": "assistant",
+            "content": output
+        },
+        "image": image,
+        "dataframe": dataframe_json
+    }
+
 
 @app.get("/chat/history")
 def chat_history():
